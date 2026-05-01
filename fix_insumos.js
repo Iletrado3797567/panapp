@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react'
+const fs = require('fs')
+
+const content = `import { useState, useEffect } from 'react'
 import { list, create, update, remove } from '../../api/sheetsClient'
 
 const SHEET = 'INSUMOS'
@@ -183,7 +185,7 @@ export default function InsumosPage() {
                   <td className="px-4 py-3 font-medium">{ins.Nombre}</td>
                   <td className="px-4 py-3 text-muted-foreground">{ins.Unidad}</td>
                   <td className="px-4 py-3 text-right">
-                    {ins.CostoRef ? `${parseFloat(ins.CostoRef).toFixed(2)} €` : '—'}
+                    {ins.CostoRef ? \`\${parseFloat(ins.CostoRef).toFixed(2)} €\` : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -208,3 +210,7 @@ export default function InsumosPage() {
     </div>
   )
 }
+`
+
+fs.writeFileSync('src/pages/stock/InsumosPage.jsx', content)
+console.log('InsumosPage.jsx corregido OK')
