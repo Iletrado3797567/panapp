@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import InsumosPage from './stock/InsumosPage'
-import ObradorPage from './ObradorPage'
 
 const TABS = ['COMPRAS', 'STOCK', 'OBRADOR', 'VENTAS']
 
@@ -16,10 +15,12 @@ function PendingModule({ nombre }) {
 export default function HomePage() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('STOCK')
+  const [activeSubTab, setActiveSubTab] = useState('Insumos')
 
   function renderContent() {
-    if (activeTab === 'STOCK') return <InsumosPage />
-    if (activeTab === 'OBRADOR') return <ObradorPage />
+    if (activeTab === 'STOCK') {
+      return <InsumosPage />
+    }
     return <PendingModule nombre={activeTab} />
   }
 
