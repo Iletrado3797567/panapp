@@ -1,10 +1,83 @@
 import { useState, useEffect } from 'react'
 import { list, create, update, remove } from '../../api/sheetsClient'
+import Breadcrumb from '../shared/Breadcrumb'
+import ProductosPage from './ProductosPage'
 
 const SHEET = 'CATEGORIAS'
 
-// ─── Formulario de creación / edición ────────────────────────────────────────
-function CategoriaForm({ initial, onSave, onCancel }) {
+// ─── Componentes compartidos ──────────────────────────────────────────────────
+
+function ModalConfirmDelete({ nombre, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-xl mx-4 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">¿Eliminar?</h3>
+        <p className="text-gray-600 mb-6">
+          Vas a eliminar <span className="font-bold text-gray-900">{nombre}</span>.
+          Esta acción no se puede deshacer.
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 border border-gray-300 rounded-xl py-3 text-sm font-medium hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={onConfirm} className="flex-1 bg-red-500 text-white rounded-xl py-3 text-sm font-medium hover:bg-red-600">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ActionBar({ label, onEdit, onDelete }) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg px-4 py-3 flex items-center gap-3">
+      <span className="flex-1 text-sm font-medium text-gray-700 truncate">{label}</span>
+      <button onClick={onEdit} className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90">
+        ✏️ Editar
+      </button>
+      <button onClick={onDelete} className="flex items-center gap-2 bg-red-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-red-600">
+        🗑 Eliminar
+      </button>
+    </div>
+  )
+}
+
+export function SearchBar({ value, onChange, placeholder }) {
+  return (
+    <div className="relative mb-4">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+      <input
+        className="w-full border rounded-lg pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder || 'Buscar...'}
+      />
+      {value && (
+        <button
+          onClick={() => onChange('')}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Panel que ocupa toda la pantalla para niveles hijos
+export function FullScreenPanel({ children }) {
+  return (
+    <div className="fixed inset-0 z-30 bg-background overflow-y-auto">
+      <div className="p-4">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// ─── Formulario de categoría ──────────────────────────────────────────────────
+function CategoriaForm({ initial, onSave, onCancel, onVerProductos }) {
   const [nombre, setNombre] = useState(initial?.Nombre || '')
 
   function handleSubmit() {
@@ -14,7 +87,9 @@ function CategoriaForm({ initial, onSave, onCancel }) {
 
   return (
     <div className="bg-white border rounded-lg p-4 mb-4 shadow-sm">
-      <h3 className="font-semibold mb-3">{initial ? 'Editar categoría' : 'Nueva categoría'}</h3>
+      <h3 className="font-semibold mb-3">
+        {initial ? 'Editar categoría' : 'Nueva categoría'}
+      </h3>
       <div className="max-w-sm">
         <label className="text-sm text-muted-foreground block mb-1">Nombre *</label>
         <input
@@ -25,84 +100,28 @@ function CategoriaForm({ initial, onSave, onCancel }) {
           autoFocus
         />
       </div>
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={handleSubmit}
-          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:opacity-90"
-        >
+      <div className="flex flex-wrap gap-2 mt-4">
+        <button onClick={handleSubmit} className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:opacity-90">
           Guardar
         </button>
-        <button
-          onClick={onCancel}
-          className="border px-4 py-2 rounded text-sm hover:bg-gray-50"
-        >
+        <button onClick={onCancel} className="border px-4 py-2 rounded text-sm hover:bg-gray-50">
           Cancelar
         </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Modal de confirmación de borrado ─────────────────────────────────────────
-function ModalConfirmDelete({ categoria, onConfirm, onCancel }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={onCancel}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-xl mx-4 p-6 w-full max-w-sm"
-        onClick={e => e.stopPropagation()}
-      >
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">¿Eliminar categoría?</h3>
-        <p className="text-gray-600 mb-6">
-          Vas a eliminar <span className="font-bold text-gray-900">{categoria.Nombre}</span>.
-          Esta acción no se puede deshacer.
-        </p>
-        <div className="flex gap-3">
+        {initial && onVerProductos && (
           <button
-            onClick={onCancel}
-            className="flex-1 border border-gray-300 rounded-xl py-3 text-sm font-medium hover:bg-gray-50 active:bg-gray-100"
+            onClick={onVerProductos}
+            className="ml-auto flex items-center gap-2 border border-primary text-primary px-4 py-2 rounded text-sm hover:bg-orange-50"
           >
-            Cancelar
+            📦 Ver productos →
           </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 bg-red-500 text-white rounded-xl py-3 text-sm font-medium hover:bg-red-600 active:bg-red-700"
-          >
-            Eliminar
-          </button>
-        </div>
+        )}
       </div>
-    </div>
-  )
-}
-
-// ─── Barra de acciones fija ───────────────────────────────────────────────────
-function ActionBar({ categoria, onEdit, onDelete }) {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg px-4 py-3 flex items-center gap-3">
-      <span className="flex-1 text-sm font-medium text-gray-700 truncate">
-        {categoria.Nombre}
-      </span>
-      <button
-        onClick={onEdit}
-        className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 active:opacity-80"
-      >
-        ✏️ Editar
-      </button>
-      <button
-        onClick={onDelete}
-        className="flex items-center gap-2 bg-red-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-red-600 active:bg-red-700"
-      >
-        🗑 Eliminar
-      </button>
     </div>
   )
 }
 
 // ─── Página principal ─────────────────────────────────────────────────────────
-export default function CategoriasPage() {
+export default function CategoriasPage({ breadcrumbBase = [] }) {
   const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -110,6 +129,8 @@ export default function CategoriasPage() {
   const [editing, setEditing] = useState(null)
   const [selected, setSelected] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [busqueda, setBusqueda] = useState('')
+  const [nivelProductos, setNivelProductos] = useState(null) // categoría activa al navegar a productos
 
   async function load() {
     try {
@@ -159,11 +180,50 @@ export default function CategoriasPage() {
     setEditing(null)
   }
 
-  const categoriasOrdenadas = [...categorias].sort((a, b) => parseInt(b.Id) - parseInt(a.Id))
-  const listPaddingBottom = selected ? 'pb-24' : 'pb-4'
+  function handleVerProductos() {
+    setNivelProductos(editing)
+    setEditing(null)
+    setShowForm(false)
+    setSelected(null)
+  }
+
+  function handleVolverDeProductos() {
+    const cat = nivelProductos
+    setNivelProductos(null)
+    setEditing(cat)
+  }
+
+  // ── Nivel productos ────────────────────────────────────────────────────────
+  if (nivelProductos) {
+    const crumbs = [
+      ...breadcrumbBase,
+      { label: 'Categorías', onClick: () => { setNivelProductos(null); setEditing(null) } },
+      { label: nivelProductos.Nombre, onClick: handleVolverDeProductos },
+      { label: 'Productos' },
+    ]
+    return (
+      <FullScreenPanel>
+        <Breadcrumb crumbs={crumbs} />
+        <ProductosPage
+          categoriaFija={nivelProductos}
+          breadcrumbBase={crumbs.slice(0, -1)}
+          onVolver={handleVolverDeProductos}
+        />
+      </FullScreenPanel>
+    )
+  }
+
+  // ── Vista lista de categorías ──────────────────────────────────────────────
+  const crumbs = [...breadcrumbBase, { label: 'Categorías' }]
+
+  const categoriasFiltradas = [...categorias]
+    .filter(c => c.Nombre.toUpperCase().includes(busqueda.toUpperCase()))
+    .sort((a, b) => parseInt(b.Id) - parseInt(a.Id))
 
   return (
     <div onClick={() => setSelected(null)}>
+
+      <Breadcrumb crumbs={crumbs} />
 
       {/* Cabecera */}
       <div className="flex items-center justify-between mb-4" onClick={e => e.stopPropagation()}>
@@ -174,6 +234,11 @@ export default function CategoriasPage() {
         >
           + Nueva categoría
         </button>
+      </div>
+
+      {/* Búsqueda */}
+      <div onClick={e => e.stopPropagation()}>
+        <SearchBar value={busqueda} onChange={setBusqueda} placeholder="Buscar categoría..." />
       </div>
 
       {/* Error */}
@@ -190,6 +255,7 @@ export default function CategoriasPage() {
             initial={editing}
             onSave={handleSave}
             onCancel={() => { setShowForm(false); setEditing(null) }}
+            onVerProductos={editing ? handleVerProductos : null}
           />
         </div>
       )}
@@ -197,10 +263,15 @@ export default function CategoriasPage() {
       {/* Lista */}
       {loading ? (
         <p className="text-muted-foreground text-sm">Cargando...</p>
-      ) : categorias.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No hay categorías. Crea la primera.</p>
+      ) : categoriasFiltradas.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          {categorias.length === 0 ? 'No hay categorías. Crea la primera.' : 'No hay resultados.'}
+        </p>
       ) : (
-        <div className={`bg-white rounded-lg border overflow-hidden ${listPaddingBottom}`} onClick={e => e.stopPropagation()}>
+        <div
+          className={`bg-white rounded-lg border overflow-hidden ${selected ? 'pb-24' : ''}`}
+          onClick={e => e.stopPropagation()}
+        >
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -209,7 +280,7 @@ export default function CategoriasPage() {
               </tr>
             </thead>
             <tbody>
-              {categoriasOrdenadas.map((cat, i) => {
+              {categoriasFiltradas.map((cat, i) => {
                 const isSelected = selected?.Id === cat.Id
                 return (
                   <tr
@@ -219,9 +290,7 @@ export default function CategoriasPage() {
                       'cursor-pointer transition-colors',
                       isSelected
                         ? 'bg-orange-100 border-l-4 border-l-primary'
-                        : i % 2 === 0
-                          ? 'bg-white hover:bg-orange-50'
-                          : 'bg-gray-50 hover:bg-orange-50',
+                        : i % 2 === 0 ? 'bg-white hover:bg-orange-50' : 'bg-gray-50 hover:bg-orange-50',
                     ].join(' ')}
                   >
                     <td className="px-4 py-3 text-muted-foreground w-16">{cat.Id}</td>
@@ -234,10 +303,10 @@ export default function CategoriasPage() {
         </div>
       )}
 
-      {/* Barra de acciones */}
+      {/* ActionBar */}
       {selected && !showForm && !editing && (
         <ActionBar
-          categoria={selected}
+          label={selected.Nombre}
           onEdit={() => { setEditing(selected); setSelected(null) }}
           onDelete={() => setConfirmDelete(selected)}
         />
@@ -246,7 +315,7 @@ export default function CategoriasPage() {
       {/* Modal borrado */}
       {confirmDelete && (
         <ModalConfirmDelete
-          categoria={confirmDelete}
+          nombre={confirmDelete.Nombre}
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(null)}
         />

@@ -1,19 +1,61 @@
 import { useState, useEffect } from 'react'
 import { list, create, update, remove } from '../../api/sheetsClient'
+import Breadcrumb from '../shared/Breadcrumb'
+import { SearchBar, FullScreenPanel } from './CategoriasPage'
 
 const SHEET = 'PRODUCTOS'
 
-// ─── Formulario de creación / edición ────────────────────────────────────────
-function ProductoForm({ initial, categorias, onSave, onCancel }) {
-  const [catId, setCatId] = useState(initial?.Cat_Id || '')
+// ─── Componentes compartidos ──────────────────────────────────────────────────
+
+function ModalConfirmDelete({ nombre, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onCancel}>
+      <div className="bg-white rounded-2xl shadow-xl mx-4 p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold mb-2 text-gray-900">¿Eliminar?</h3>
+        <p className="text-gray-600 mb-6">
+          Vas a eliminar <span className="font-bold text-gray-900">{nombre}</span>.
+          Esta acción no se puede deshacer.
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 border border-gray-300 rounded-xl py-3 text-sm font-medium hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={onConfirm} className="flex-1 bg-red-500 text-white rounded-xl py-3 text-sm font-medium hover:bg-red-600">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ActionBar({ label, onEdit, onDelete }) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg px-4 py-3 flex items-center gap-3">
+      <span className="flex-1 text-sm font-medium text-gray-700 truncate">{label}</span>
+      <button onClick={onEdit} className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90">
+        ✏️ Editar
+      </button>
+      <button onClick={onDelete} className="flex items-center gap-2 bg-red-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-red-600">
+        🗑 Eliminar
+      </button>
+    </div>
+  )
+}
+
+// ─── Formulario de producto ───────────────────────────────────────────────────
+function ProductoForm({ initial, categorias, categoriaFija, onSave, onCancel, onVerVariantes }) {
+  // Si hay categoría fija (venimos desde una categoría), la usamos directamente
+  const [catId, setCatId] = useState(
+    categoriaFija ? String(categoriaFija.Id) : (initial?.Cat_Id || '')
+  )
   const [nombre, setNombre] = useState(initial?.Nombre || '')
   const [precio1, setPrecio1] = useState(initial?.Precio1 || '')
   const [precio2, setPrecio2] = useState(initial?.Precio2 || '')
   const [costo, setCosto] = useState(initial?.Costo || '')
   const [notas, setNotas] = useState(initial?.Notas || '')
 
-  // Al montar en modo edición, catId ya viene relleno
-  const catSeleccionada = categorias.find(c => String(c.Id) === String(catId))
+  const catSeleccionada = categoriaFija || categorias.find(c => String(c.Id) === String(catId))
 
   function handleSubmit() {
     if (!nombre.trim() || !catId) return
@@ -34,19 +76,25 @@ function ProductoForm({ initial, categorias, onSave, onCancel }) {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 
-        {/* Categoría */}
+        {/* Categoría: fija (solo lectura) o desplegable */}
         <div>
           <label className="text-sm text-muted-foreground block mb-1">Categoría *</label>
-          <select
-            className="w-full border rounded px-3 py-2 text-sm"
-            value={catId}
-            onChange={e => setCatId(e.target.value)}
-          >
-            <option value="">— Selecciona —</option>
-            {categorias.map(c => (
-              <option key={c.Id} value={c.Id}>{c.Nombre}</option>
-            ))}
-          </select>
+          {categoriaFija ? (
+            <div className="w-full border rounded px-3 py-2 text-sm bg-gray-50 text-gray-600">
+              {categoriaFija.Nombre}
+            </div>
+          ) : (
+            <select
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={catId}
+              onChange={e => setCatId(e.target.value)}
+            >
+              <option value="">— Selecciona —</option>
+              {categorias.map(c => (
+                <option key={c.Id} value={c.Id}>{c.Nombre}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Nombre */}
@@ -57,6 +105,7 @@ function ProductoForm({ initial, categorias, onSave, onCancel }) {
             value={nombre}
             onChange={e => setNombre(e.target.value.toUpperCase())}
             placeholder="EJ: PAN DE CENTENO"
+            autoFocus
           />
         </div>
 
@@ -65,8 +114,7 @@ function ProductoForm({ initial, categorias, onSave, onCancel }) {
           <label className="text-sm text-muted-foreground block mb-1">Precio estándar (€)</label>
           <input
             className="w-full border rounded px-3 py-2 text-sm"
-            type="number"
-            step="0.01"
+            type="number" step="0.01"
             value={precio1}
             onChange={e => setPrecio1(e.target.value)}
             placeholder="0.00"
@@ -78,8 +126,7 @@ function ProductoForm({ initial, categorias, onSave, onCancel }) {
           <label className="text-sm text-muted-foreground block mb-1">Precio especial (€)</label>
           <input
             className="w-full border rounded px-3 py-2 text-sm"
-            type="number"
-            step="0.01"
+            type="number" step="0.01"
             value={precio2}
             onChange={e => setPrecio2(e.target.value)}
             placeholder="0.00"
@@ -91,15 +138,12 @@ function ProductoForm({ initial, categorias, onSave, onCancel }) {
           <label className="text-sm text-muted-foreground block mb-1">Costo (€)</label>
           <input
             className="w-full border rounded px-3 py-2 text-sm"
-            type="number"
-            step="0.0001"
+            type="number" step="0.0001"
             value={costo}
             onChange={e => setCosto(e.target.value)}
             placeholder="0.00"
           />
-          <p className="text-xs text-muted-foreground mt-1">
-            Normalmente se actualiza desde Fórmulas
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">Normalmente se actualiza desde Fórmulas</p>
         </div>
 
         {/* Notas */}
@@ -115,84 +159,33 @@ function ProductoForm({ initial, categorias, onSave, onCancel }) {
 
       </div>
 
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={handleSubmit}
-          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:opacity-90"
-        >
+      <div className="flex flex-wrap gap-2 mt-4">
+        <button onClick={handleSubmit} className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:opacity-90">
           Guardar
         </button>
-        <button
-          onClick={onCancel}
-          className="border px-4 py-2 rounded text-sm hover:bg-gray-50"
-        >
+        <button onClick={onCancel} className="border px-4 py-2 rounded text-sm hover:bg-gray-50">
           Cancelar
         </button>
+        {/* Ver variantes: solo en edición */}
+        {initial && onVerVariantes && (
+          <button
+            onClick={onVerVariantes}
+            className="ml-auto flex items-center gap-2 border border-primary text-primary px-4 py-2 rounded text-sm hover:bg-orange-50"
+          >
+            🔧 Ver variantes →
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
-// ─── Modal de confirmación de borrado ─────────────────────────────────────────
-function ModalConfirmDelete({ producto, onConfirm, onCancel }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={onCancel}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-xl mx-4 p-6 w-full max-w-sm"
-        onClick={e => e.stopPropagation()}
-      >
-        <h3 className="text-lg font-semibold mb-2 text-gray-900">¿Eliminar producto?</h3>
-        <p className="text-gray-600 mb-6">
-          Vas a eliminar <span className="font-bold text-gray-900">{producto.Nombre}</span>.
-          Esta acción no se puede deshacer.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 border border-gray-300 rounded-xl py-3 text-sm font-medium hover:bg-gray-50 active:bg-gray-100"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 bg-red-500 text-white rounded-xl py-3 text-sm font-medium hover:bg-red-600 active:bg-red-700"
-          >
-            Eliminar
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Barra de acciones fija ───────────────────────────────────────────────────
-function ActionBar({ producto, onEdit, onDelete }) {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg px-4 py-3 flex items-center gap-3">
-      <span className="flex-1 text-sm font-medium text-gray-700 truncate">
-        {producto.Nombre}
-      </span>
-      <button
-        onClick={onEdit}
-        className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 active:opacity-80"
-      >
-        ✏️ Editar
-      </button>
-      <button
-        onClick={onDelete}
-        className="flex items-center gap-2 bg-red-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-red-600 active:bg-red-700"
-      >
-        🗑 Eliminar
-      </button>
-    </div>
-  )
-}
-
-// ─── Página principal ─────────────────────────────────────────────────────────
-export default function ProductosPage() {
+// ─── Página principal de Productos ───────────────────────────────────────────
+// Props:
+//   categoriaFija  → objeto categoría cuando venimos desde CategoriasPage (filtra y prelrellena)
+//   breadcrumbBase → array de crumbs del nivel superior
+//   onVolver       → fn para volver al nivel anterior
+export default function ProductosPage({ categoriaFija, breadcrumbBase = [], onVolver }) {
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
@@ -201,7 +194,11 @@ export default function ProductosPage() {
   const [editing, setEditing] = useState(null)
   const [selected, setSelected] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
-  const [filtroCategoria, setFiltroCategoria] = useState('') // '' = todas
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroCategoria, setFiltroCategoria] = useState(
+    categoriaFija ? String(categoriaFija.Id) : ''
+  )
+  const [nivelVariantes, setNivelVariantes] = useState(null) // producto activo al navegar a variantes
 
   async function load() {
     try {
@@ -252,29 +249,90 @@ export default function ProductosPage() {
     setEditing(null)
   }
 
-  // Filtrado por categoría + orden descendente por Id
-  const productosFiltrados = [...productos]
-    .filter(p => filtroCategoria === '' || String(p.Cat_Id) === filtroCategoria)
-    .sort((a, b) => parseInt(b.Id) - parseInt(a.Id))
+  function handleVerVariantes() {
+    setNivelVariantes(editing)
+    setEditing(null)
+    setShowForm(false)
+    setSelected(null)
+  }
 
-  const listPaddingBottom = selected ? 'pb-24' : 'pb-4'
+  function handleVolverDeVariantes() {
+    const prod = nivelVariantes
+    setNivelVariantes(null)
+    setEditing(prod)
+  }
+
+  // ── Nivel variantes (placeholder hasta que hagamos VariantesPage) ──────────
+  if (nivelVariantes) {
+    const crumbs = [
+      ...breadcrumbBase,
+      { label: 'Productos', onClick: () => { setNivelVariantes(null); setEditing(null) } },
+      { label: nivelVariantes.Nombre, onClick: handleVolverDeVariantes },
+      { label: 'Variantes' },
+    ]
+    return (
+      <FullScreenPanel>
+        <Breadcrumb crumbs={crumbs} />
+        {/* VariantesPage se conectará aquí en la próxima iteración */}
+        <div className="flex flex-col items-center justify-center h-48 gap-4 text-muted-foreground">
+          <p>Módulo <strong>Variantes</strong> en construcción...</p>
+          <button
+            onClick={handleVolverDeVariantes}
+            className="flex items-center gap-2 border px-4 py-2 rounded text-sm hover:bg-gray-50"
+          >
+            ← Volver a {nivelVariantes.Nombre}
+          </button>
+        </div>
+      </FullScreenPanel>
+    )
+  }
+
+  // ── Vista lista de productos ───────────────────────────────────────────────
+  const crumbs = [...breadcrumbBase, { label: 'Productos' }]
+
+  const productosFiltrados = [...productos]
+    .filter(p => {
+      const coincideCategoria = filtroCategoria === '' || String(p.Cat_Id) === filtroCategoria
+      const coincideBusqueda = p.Nombre.toUpperCase().includes(busqueda.toUpperCase())
+      return coincideCategoria && coincideBusqueda
+    })
+    .sort((a, b) => parseInt(b.Id) - parseInt(a.Id))
 
   return (
     <div onClick={() => setSelected(null)}>
 
+      <Breadcrumb crumbs={crumbs} />
+
       {/* Cabecera */}
       <div className="flex items-center justify-between mb-4" onClick={e => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold">Productos</h2>
-        <button
-          onClick={() => { setShowForm(true); setEditing(null); setSelected(null) }}
-          className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:opacity-90"
-        >
-          + Nuevo producto
-        </button>
+        <h2 className="text-lg font-semibold">
+          {categoriaFija ? `Productos — ${categoriaFija.Nombre}` : 'Productos'}
+        </h2>
+        <div className="flex items-center gap-2">
+          {onVolver && (
+            <button
+              onClick={onVolver}
+              className="border px-3 py-2 rounded text-sm hover:bg-gray-50"
+            >
+              ← Volver
+            </button>
+          )}
+          <button
+            onClick={() => { setShowForm(true); setEditing(null); setSelected(null) }}
+            className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:opacity-90"
+          >
+            + Nuevo producto
+          </button>
+        </div>
       </div>
 
-      {/* Filtro por categoría */}
-      {categorias.length > 0 && (
+      {/* Búsqueda */}
+      <div onClick={e => e.stopPropagation()}>
+        <SearchBar value={busqueda} onChange={setBusqueda} placeholder="Buscar producto..." />
+      </div>
+
+      {/* Filtro por categoría (solo cuando no hay categoría fija) */}
+      {!categoriaFija && categorias.length > 0 && (
         <div className="mb-4" onClick={e => e.stopPropagation()}>
           <select
             className="border rounded px-3 py-2 text-sm"
@@ -283,11 +341,8 @@ export default function ProductosPage() {
           >
             <option value="">Todas las categorías</option>
             {categorias
-              .slice()
-              .sort((a, b) => a.Nombre.localeCompare(b.Nombre))
-              .map(c => (
-                <option key={c.Id} value={c.Id}>{c.Nombre}</option>
-              ))}
+              .slice().sort((a, b) => a.Nombre.localeCompare(b.Nombre))
+              .map(c => <option key={c.Id} value={c.Id}>{c.Nombre}</option>)}
           </select>
         </div>
       )}
@@ -305,8 +360,10 @@ export default function ProductosPage() {
           <ProductoForm
             initial={editing}
             categorias={categorias}
+            categoriaFija={categoriaFija}
             onSave={handleSave}
             onCancel={() => { setShowForm(false); setEditing(null) }}
+            onVerVariantes={editing ? handleVerVariantes : null}
           />
         </div>
       )}
@@ -318,11 +375,11 @@ export default function ProductosPage() {
         <p className="text-muted-foreground text-sm">
           {productos.length === 0
             ? 'No hay productos. Crea el primero.'
-            : 'No hay productos en esta categoría.'}
+            : 'No hay resultados.'}
         </p>
       ) : (
         <div
-          className={`bg-white rounded-lg border overflow-hidden ${listPaddingBottom}`}
+          className={`bg-white rounded-lg border overflow-hidden ${selected ? 'pb-24' : ''}`}
           onClick={e => e.stopPropagation()}
         >
           <table className="w-full text-sm">
@@ -346,17 +403,12 @@ export default function ProductosPage() {
                       'cursor-pointer transition-colors',
                       isSelected
                         ? 'bg-orange-100 border-l-4 border-l-primary'
-                        : i % 2 === 0
-                          ? 'bg-white hover:bg-orange-50'
-                          : 'bg-gray-50 hover:bg-orange-50',
+                        : i % 2 === 0 ? 'bg-white hover:bg-orange-50' : 'bg-gray-50 hover:bg-orange-50',
                     ].join(' ')}
                   >
                     <td className="px-4 py-3 font-medium">
                       {prod.Nombre}
-                      {/* En móvil mostramos la categoría bajo el nombre */}
-                      <span className="block text-xs text-muted-foreground sm:hidden">
-                        {prod.Categoria}
-                      </span>
+                      <span className="block text-xs text-muted-foreground sm:hidden">{prod.Categoria}</span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{prod.Categoria}</td>
                     <td className="px-4 py-3 text-right">
@@ -376,10 +428,10 @@ export default function ProductosPage() {
         </div>
       )}
 
-      {/* Barra de acciones */}
+      {/* ActionBar */}
       {selected && !showForm && !editing && (
         <ActionBar
-          producto={selected}
+          label={selected.Nombre}
           onEdit={() => { setEditing(selected); setSelected(null) }}
           onDelete={() => setConfirmDelete(selected)}
         />
@@ -388,7 +440,7 @@ export default function ProductosPage() {
       {/* Modal borrado */}
       {confirmDelete && (
         <ModalConfirmDelete
-          producto={confirmDelete}
+          nombre={confirmDelete.Nombre}
           onConfirm={handleDelete}
           onCancel={() => setConfirmDelete(null)}
         />
