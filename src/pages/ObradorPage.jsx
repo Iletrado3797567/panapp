@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import CategoriasPage from './obrador/CategoriasPage'
+import ProductosPage from './obrador/ProductosPage'
 
 const SUB_TABS = ['Categorías', 'Productos', 'Variantes', 'Fórmulas']
 
@@ -16,6 +17,7 @@ export default function ObradorPage() {
 
   function renderSubContent() {
     if (activeSubTab === 'Categorías') return <CategoriasPage />
+    if (activeSubTab === 'Productos') return <ProductosPage />
     return <PendingModule nombre={activeSubTab} />
   }
 
