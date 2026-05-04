@@ -137,6 +137,7 @@ export default function InsumosPage() {
   const [editing, setEditing] = useState(null)
   const [selected, setSelected] = useState(null)       // insumo seleccionado (toque)
   const [confirmDelete, setConfirmDelete] = useState(null) // insumo pendiente de borrar
+  const [busqueda, setBusqueda] = useState('')
 
   async function load() {
     try {
@@ -204,7 +205,9 @@ export default function InsumosPage() {
     setConfirmDelete(selected)
   }
 
-  const insumosOrdenados = [...insumos].sort((a, b) => parseInt(b.Id) - parseInt(a.Id))
+  const insumosOrdenados = [...insumos]
+    .filter(ins => ins.Nombre.toUpperCase().includes(busqueda.toUpperCase()))
+    .sort((a, b) => parseInt(b.Id) - parseInt(a.Id))
 
   // Añadir padding inferior cuando la ActionBar está visible para que la tabla no quede tapada
   const listPaddingBottom = selected ? 'pb-24' : 'pb-4'
@@ -222,6 +225,25 @@ export default function InsumosPage() {
         >
           + Nuevo insumo
         </button>
+      </div>
+
+      {/* Barra de búsqueda */}
+      <div className="relative mb-4" onClick={e => e.stopPropagation()}>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+        <input
+          className="w-full border rounded-lg pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value.toUpperCase())}
+          placeholder="Buscar insumo..."
+        />
+        {busqueda && (
+          <button
+            onClick={() => setBusqueda('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none"
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {/* Error */}
@@ -250,6 +272,8 @@ export default function InsumosPage() {
         <p className="text-muted-foreground text-sm">Cargando...</p>
       ) : insumos.length === 0 ? (
         <p className="text-muted-foreground text-sm">No hay insumos. Crea el primero.</p>
+      ) : insumosOrdenados.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No hay resultados para esa búsqueda.</p>
       ) : (
         <div
           className={`bg-white rounded-lg border overflow-hidden ${listPaddingBottom}`}
