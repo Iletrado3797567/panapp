@@ -1,8 +1,5 @@
-import { useState } from 'react'
 import CategoriasPage from './obrador/CategoriasPage'
 import ProductosPage from './obrador/ProductosPage'
-
-const SUB_TABS = ['Categorías', 'Productos', 'Variantes', 'Fórmulas']
 
 function PendingModule({ nombre }) {
   return (
@@ -12,33 +9,20 @@ function PendingModule({ nombre }) {
   )
 }
 
-export default function ObradorPage() {
-  const [activeSubTab, setActiveSubTab] = useState('Categorías')
-
-  function renderSubContent() {
-    if (activeSubTab === 'Categorías') return <CategoriasPage />
-    if (activeSubTab === 'Productos') return <ProductosPage />
-    return <PendingModule nombre={activeSubTab} />
+export default function ObradorPage({ submodulo, breadcrumbExtra, onSubmodChange }) {
+  if (submodulo === 'Categorías') {
+    return (
+      <CategoriasPage
+        breadcrumbExtra={breadcrumbExtra}
+      />
+    )
   }
-
-  return (
-    <div>
-      <div className="flex gap-1 mb-4 border-b pb-0">
-        {SUB_TABS.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveSubTab(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-t transition-colors border-b-2 ${
-              activeSubTab === tab
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-      {renderSubContent()}
-    </div>
-  )
+  if (submodulo === 'Productos') {
+    return (
+      <ProductosPage
+        breadcrumbExtra={breadcrumbExtra}
+      />
+    )
+  }
+  return <PendingModule nombre={submodulo} />
 }

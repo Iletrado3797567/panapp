@@ -1,13 +1,7 @@
-import { useGoogleLogin } from "@react-oauth/google"
 import { useAuth } from "./AuthContext"
 
 export default function LoginPage() {
-  const { loginSuccess } = useAuth()
-
-  const login = useGoogleLogin({
-    onSuccess: loginSuccess,
-    scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file",
-  })
+  const { login } = useAuth()
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4">

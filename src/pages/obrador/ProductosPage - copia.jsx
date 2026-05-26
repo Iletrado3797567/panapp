@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { list, create, update, remove } from '../../api/sheetsClient'
 import { Breadcrumb, SearchBar, FullScreenPanel, ActionBar, ModalConfirmDelete } from '../shared'
-import VariantesPage from './VariantesPage'
+
 const SHEET = 'PRODUCTOS'
 
 function ProductoForm({ initial, categorias, categoriaFija, onSave, onCancel, onVerVariantes }) {
@@ -9,7 +9,6 @@ function ProductoForm({ initial, categorias, categoriaFija, onSave, onCancel, on
     categoriaFija ? String(categoriaFija.Id) : (initial?.Cat_Id || '')
   )
   const [nombre, setNombre] = useState(initial?.Nombre || '')
-  const [masa, setMasa] = useState(initial?.Masa || '')
   const [precio1, setPrecio1] = useState(initial?.Precio1 || '')
   const [precio2, setPrecio2] = useState(initial?.Precio2 || '')
   const [costo, setCosto] = useState(initial?.Costo || '')
@@ -23,7 +22,6 @@ function ProductoForm({ initial, categorias, categoriaFija, onSave, onCancel, on
       Categoria: catSeleccionada?.Nombre || '',
       Cat_Id: String(catId),
       Nombre: nombre.trim().toUpperCase(),
-      Masa: masa,
       Precio1: precio1,
       Precio2: precio2,
       Costo: costo,
@@ -68,17 +66,6 @@ function ProductoForm({ initial, categorias, categoriaFija, onSave, onCancel, on
         </div>
 
         <div>
-          <label className="text-sm text-muted-foreground block mb-1">Gramos de masa</label>
-          <input
-            className="w-full border rounded px-3 py-2 text-sm"
-            type="number" step="1"
-            value={masa}
-            onChange={e => setMasa(e.target.value)}
-            placeholder="EJ: 900"
-          />
-        </div>
-
-        <div>
           <label className="text-sm text-muted-foreground block mb-1">Precio estándar (€)</label>
           <input
             className="w-full border rounded px-3 py-2 text-sm"
@@ -112,7 +99,7 @@ function ProductoForm({ initial, categorias, categoriaFija, onSave, onCancel, on
           <p className="text-xs text-muted-foreground mt-1">Normalmente se actualiza desde Fórmulas</p>
         </div>
 
-        <div className="sm:col-span-2">
+        <div>
           <label className="text-sm text-muted-foreground block mb-1">Notas</label>
           <input
             className="w-full border rounded px-3 py-2 text-sm"
@@ -149,6 +136,9 @@ function ProductoForm({ initial, categorias, categoriaFija, onSave, onCancel, on
   )
 }
 
+// Props:
+//   categoriaFija → objeto categoría cuando venimos desde CategoriasPage
+//   onVolver      → fn para volver al nivel anterior
 export default function ProductosPage({ categoriaFija, onVolver, breadcrumbExtra = [] }) {
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
@@ -225,28 +215,36 @@ export default function ProductosPage({ categoriaFija, onVolver, breadcrumbExtra
     setNivelVariantes(null)
     setEditing(prod)
   }
- 
 
-
+  // ── Nivel variantes (placeholder hasta VariantesPage) ─────────────────────
   if (nivelVariantes) {
     const crumbs = [
       ...breadcrumbExtra,
+      { label: 'Productos', onClick: () => { setNivelVariantes(null); setEditing(null) } },
       { label: nivelVariantes.Nombre, onClick: handleVolverDeVariantes },
-      
+      { label: 'Variantes' },
     ]
     return (
-      
-        <VariantesPage
-          productoFijo={nivelVariantes}
-          onVolver={handleVolverDeVariantes}
-          breadcrumbExtra={crumbs}
-        />
-     
-        
+      <FullScreenPanel>
+        <Breadcrumb crumbs={crumbs} />
+        <div className="flex flex-col items-center justify-center h-48 gap-4 text-muted-foreground">
+          <p>Módulo <strong>Variantes</strong> en construcción...</p>
+          <button
+            onClick={handleVolverDeVariantes}
+            className="flex items-center gap-2 border px-4 py-2 rounded text-sm hover:bg-gray-50"
+          >
+            ← Volver a {nivelVariantes.Nombre}
+          </button>
+        </div>
+      </FullScreenPanel>
     )
   }
 
-  const crumbs = [...breadcrumbExtra]
+  // ── Vista lista de productos ───────────────────────────────────────────────
+  const crumbs = [
+    ...breadcrumbExtra,
+    { label: categoriaFija ? `Productos — ${categoriaFija.Nombre}` : 'Productos' },
+  ]
 
   const productosFiltrados = [...productos]
     .filter(p => {
@@ -321,48 +319,61 @@ export default function ProductosPage({ categoriaFija, onVolver, breadcrumbExtra
         </div>
       )}
 
-      {!(showForm || editing) && (
-        loading ? (
-          <p className="text-muted-foreground text-sm">Cargando...</p>
-        ) : productosFiltrados.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {productos.length === 0 ? 'No hay productos. Crea el primero.' : 'No hay resultados.'}
-          </p>
-        ) : (
-          <div
-            className={`bg-white rounded-lg border overflow-hidden ${selected ? 'pb-24' : ''}`}
-            onClick={e => e.stopPropagation()}
-          >
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Categoría</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productosFiltrados.map((prod, i) => {
-                  const isSelected = selected?.Id === prod.Id
-                  return (
-                    <tr
-                      key={prod.Id}
-                      onClick={() => handleRowClick(prod)}
-                      className={[
-                        'cursor-pointer transition-colors',
-                        isSelected
-                          ? 'bg-orange-100 border-l-4 border-l-primary'
-                          : i % 2 === 0 ? 'bg-white hover:bg-orange-50' : 'bg-gray-50 hover:bg-orange-50',
-                      ].join(' ')}
-                    >
-                      <td className="px-4 py-3 font-medium">{prod.Nombre}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{prod.Categoria}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
+      {loading ? (
+        <p className="text-muted-foreground text-sm">Cargando...</p>
+      ) : productosFiltrados.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          {productos.length === 0 ? 'No hay productos. Crea el primero.' : 'No hay resultados.'}
+        </p>
+      ) : (
+        <div
+          className={`bg-white rounded-lg border overflow-hidden ${selected ? 'pb-24' : ''}`}
+          onClick={e => e.stopPropagation()}
+        >
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Categoría</th>
+                <th className="text-right px-4 py-3 font-medium text-muted-foreground">P. estándar</th>
+                <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">P. especial</th>
+                <th className="text-right px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Costo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productosFiltrados.map((prod, i) => {
+                const isSelected = selected?.Id === prod.Id
+                return (
+                  <tr
+                    key={prod.Id}
+                    onClick={() => handleRowClick(prod)}
+                    className={[
+                      'cursor-pointer transition-colors',
+                      isSelected
+                        ? 'bg-orange-100 border-l-4 border-l-primary'
+                        : i % 2 === 0 ? 'bg-white hover:bg-orange-50' : 'bg-gray-50 hover:bg-orange-50',
+                    ].join(' ')}
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      {prod.Nombre}
+                      <span className="block text-xs text-muted-foreground sm:hidden">{prod.Categoria}</span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{prod.Categoria}</td>
+                    <td className="px-4 py-3 text-right">
+                      {prod.Precio1 ? `${parseFloat(prod.Precio1).toFixed(2)} €` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right hidden sm:table-cell">
+                      {prod.Precio2 ? `${parseFloat(prod.Precio2).toFixed(2)} €` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right hidden sm:table-cell">
+                      {prod.Costo ? `${parseFloat(prod.Costo).toFixed(4)} €` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {selected && !showForm && !editing && (

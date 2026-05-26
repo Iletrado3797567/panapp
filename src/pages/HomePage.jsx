@@ -2,8 +2,16 @@ import { useState } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import InsumosPage from './stock/InsumosPage'
 import ObradorPage from './ObradorPage'
+import { Breadcrumb } from './shared'
 
 const TABS = ['COMPRAS', 'STOCK', 'OBRADOR', 'VENTAS']
+
+const SUBMODULOS = {
+  STOCK: ['Insumos'],
+  OBRADOR: ['Categorías', 'Productos', 'Variantes', 'Fórmulas'],
+  COMPRAS: [],
+  VENTAS: [],
+}
 
 function PendingModule({ nombre }) {
   return (
@@ -13,15 +21,72 @@ function PendingModule({ nombre }) {
   )
 }
 
+function SubMenu({ tab, activeSubmod, onSelect }) {
+  const opciones = SUBMODULOS[tab] || []
+  if (opciones.length === 0) return null
+  return (
+    <div className="border-b bg-gray-50">
+      <div className="flex px-4">
+        {opciones.map(op => (
+          <button
+            key={op}
+            onClick={() => onSelect(op)}
+            className={`px-5 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeSubmod === op
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {op}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function renderSubmod(tab, submod, breadcrumbBase, onSubmodChange) {
+  if (!submod) return null
+
+  if (tab === 'STOCK' && submod === 'Insumos') {
+    return (
+      <InsumosPage
+        breadcrumbExtra={breadcrumbBase}
+      />
+    )
+  }
+
+  if (tab === 'OBRADOR') {
+    return (
+      <ObradorPage
+        submodulo={submod}
+        breadcrumbExtra={breadcrumbBase}
+        onSubmodChange={onSubmodChange}
+      />
+    )
+  }
+
+  return <PendingModule nombre={submod} />
+}
+
 export default function HomePage() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState('STOCK')
+  const [activeTab, setActiveTab] = useState(null)
+  const [activeSubmod, setActiveSubmod] = useState(null)
 
-  function renderContent() {
-    if (activeTab === 'STOCK') return <InsumosPage />
-    if (activeTab === 'OBRADOR') return <ObradorPage />
-    return <PendingModule nombre={activeTab} />
+  function handleTabChange(tab) {
+    setActiveTab(tab)
+    setActiveSubmod(null)
   }
+
+  function handleSubmodChange(submod) {
+    setActiveSubmod(submod)
+  }
+
+  const breadcrumbBase = [
+    { label: activeTab, onClick: () => setActiveSubmod(null) },
+    ...(activeSubmod ? [{ label: activeSubmod }] : []),
+  ]
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,7 +113,7 @@ export default function HomePage() {
           {TABS.map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab
                   ? 'border-primary text-primary'
@@ -61,9 +126,33 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Submenú */}
+      {activeTab && (
+        <SubMenu
+          tab={activeTab}
+          activeSubmod={activeSubmod}
+          onSelect={handleSubmodChange}
+        />
+      )}
+
       {/* Contenido */}
       <main className="p-4">
-        {renderContent()}
+        {!activeTab && (
+          <div className="flex items-center justify-center h-48 text-muted-foreground">
+            <p>Selecciona un módulo para comenzar.</p>
+          </div>
+        )}
+        {activeTab && !activeSubmod && SUBMODULOS[activeTab].length > 0 && (
+          <div className="flex items-center justify-center h-48 text-muted-foreground">
+            <p>Selecciona una opción del menú.</p>
+          </div>
+        )}
+        {activeTab && activeSubmod && (
+          renderSubmod(activeTab, activeSubmod, breadcrumbBase, handleSubmodChange)
+        )}
+        {activeTab && SUBMODULOS[activeTab].length === 0 && (
+          <PendingModule nombre={activeTab} />
+        )}
       </main>
     </div>
   )

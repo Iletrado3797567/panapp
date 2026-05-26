@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { list, create, update, remove } from '../../api/sheetsClient'
-import { Breadcrumb, SearchBar, FullScreenPanel, ActionBar, ModalConfirmDelete } from '../shared'
+import { Breadcrumb, SearchBar, ActionBar, ModalConfirmDelete } from '../shared'
 import ProductosPage from './ProductosPage'
 
 const SHEET = 'CATEGORIAS'
@@ -54,7 +54,7 @@ function CategoriaForm({ initial, onSave, onCancel, onVerProductos }) {
   )
 }
 
-export default function CategoriasPage() {
+export default function CategoriasPage({ breadcrumbExtra = [] }) {
   const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -126,33 +126,32 @@ export default function CategoriasPage() {
     setEditing(cat)
   }
 
-  // ── Nivel productos: pantalla completa ────────────────────────────────────
   if (nivelProductos) {
     const crumbs = [
+      ...breadcrumbExtra,
       { label: 'Categorías', onClick: () => { setNivelProductos(null); setEditing(null) } },
-      { label: nivelProductos.Nombre, onClick: handleVolverDeProductos },
+      { label: nivelProductos.Nombre },
       { label: 'Productos' },
     ]
     return (
-      <FullScreenPanel>
-        <Breadcrumb crumbs={crumbs} />
-        <ProductosPage
-          categoriaFija={nivelProductos}
-          onVolver={handleVolverDeProductos}
-        />
-      </FullScreenPanel>
+      <ProductosPage
+        categoriaFija={nivelProductos}
+        onVolver={handleVolverDeProductos}
+        breadcrumbExtra={crumbs}
+      />
     )
   }
 
-  // ── Vista normal ──────────────────────────────────────────────────────────
   const categoriasFiltradas = [...categorias]
     .filter(c => c.Nombre.toUpperCase().includes(busqueda.toUpperCase()))
     .sort((a, b) => parseInt(b.Id) - parseInt(a.Id))
 
+  const crumbs = [...breadcrumbExtra]
+
   return (
     <div onClick={() => setSelected(null)}>
 
-      <Breadcrumb crumbs={[{ label: 'Categorías' }]} />
+      <Breadcrumb crumbs={crumbs} />
 
       <div className="flex items-center justify-between mb-4" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-semibold">Categorías</h2>
@@ -185,46 +184,46 @@ export default function CategoriasPage() {
         </div>
       )}
 
-      {loading ? (
-        <p className="text-muted-foreground text-sm">Cargando...</p>
-      ) : categoriasFiltradas.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {categorias.length === 0 ? 'No hay categorías. Crea la primera.' : 'No hay resultados.'}
-        </p>
-      ) : (
-        <div
-          className={`bg-white rounded-lg border overflow-hidden ${selected ? 'pb-24' : ''}`}
-          onClick={e => e.stopPropagation()}
-        >
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">ID</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categoriasFiltradas.map((cat, i) => {
-                const isSelected = selected?.Id === cat.Id
-                return (
-                  <tr
-                    key={cat.Id}
-                    onClick={() => handleRowClick(cat)}
-                    className={[
-                      'cursor-pointer transition-colors',
-                      isSelected
-                        ? 'bg-orange-100 border-l-4 border-l-primary'
-                        : i % 2 === 0 ? 'bg-white hover:bg-orange-50' : 'bg-gray-50 hover:bg-orange-50',
-                    ].join(' ')}
-                  >
-                    <td className="px-4 py-3 text-muted-foreground w-16">{cat.Id}</td>
-                    <td className="px-4 py-3 font-medium">{cat.Nombre}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+      {!(showForm || editing) && (
+        loading ? (
+          <p className="text-muted-foreground text-sm">Cargando...</p>
+        ) : categoriasFiltradas.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {categorias.length === 0 ? 'No hay categorías. Crea la primera.' : 'No hay resultados.'}
+          </p>
+        ) : (
+          <div
+            className={`bg-white rounded-lg border overflow-hidden ${selected ? 'pb-24' : ''}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nombre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categoriasFiltradas.map((cat, i) => {
+                  const isSelected = selected?.Id === cat.Id
+                  return (
+                    <tr
+                      key={cat.Id}
+                      onClick={() => handleRowClick(cat)}
+                      className={[
+                        'cursor-pointer transition-colors',
+                        isSelected
+                          ? 'bg-orange-100 border-l-4 border-l-primary'
+                          : i % 2 === 0 ? 'bg-white hover:bg-orange-50' : 'bg-gray-50 hover:bg-orange-50',
+                      ].join(' ')}
+                    >
+                      <td className="px-4 py-3 font-medium">{cat.Nombre}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
 
       {selected && !showForm && !editing && (

@@ -1,9 +1,40 @@
-const SPREADSHEET_ID = '1j4ZCkeaTXelY6yvF1Rfah5-viv6rWhhRv6fO4FzGNG8'
+const SPREADSHEET_ID = '1tX-3lhsrzkkODpoLyJ1gDDLX3Ke_Kb9t8QHk8dihnbs'
 const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets'
 let accessToken = null
+let unauthorizedCallback = null
 
 export function setAccessToken(token) {
   accessToken = token
+}
+
+// El callback ahora debe devolver una Promise<string|null>
+// que resuelve con el nuevo token, o null si la renovación falla
+export function setUnauthorizedCallback(fn) {
+  unauthorizedCallback = fn
+}
+
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, options)
+  if (res.status === 401) {
+    accessToken = null
+    if (unauthorizedCallback) {
+      const newToken = await unauthorizedCallback()
+      if (newToken) {
+        // Reintentar la petición original con el token renovado
+        const retryOptions = {
+          ...options,
+          headers: {
+            ...options.headers,
+            'Authorization': `Bearer ${newToken}`,
+          },
+        }
+        const retryRes = await fetch(url, retryOptions)
+        if (retryRes.status !== 401) return retryRes
+      }
+    }
+    throw new Error('Sesión caducada. Por favor, vuelve a iniciar sesión.')
+  }
+  return res
 }
 
 function headers() {
@@ -30,14 +61,14 @@ function objectToRow(hdrs, obj) {
 }
 
 export async function list(sheet) {
-  const res = await fetch(`${BASE_URL}/${SPREADSHEET_ID}/values/${sheet}`, { headers: headers() })
+  const res = await apiFetch(`${BASE_URL}/${SPREADSHEET_ID}/values/${sheet}`, { headers: headers() })
   if (!res.ok) throw new Error(`Error ${res.status}`)
   const data = await res.json()
   return rowsToObjects(data.values)
 }
 
 async function getHeaders(sheet) {
-  const res = await fetch(`${BASE_URL}/${SPREADSHEET_ID}/values/${sheet}!1:1`, { headers: headers() })
+  const res = await apiFetch(`${BASE_URL}/${SPREADSHEET_ID}/values/${sheet}!1:1`, { headers: headers() })
   const data = await res.json()
   return data.values?.[0] ?? []
 }
@@ -49,9 +80,8 @@ async function nextId(sheet) {
   return ids.length > 0 ? Math.max(...ids) + 1 : 1
 }
 
-// Obtiene el sheetId numérico que necesita batchUpdate/deleteDimension
 async function getSheetId(sheetName) {
-  const res = await fetch(`${BASE_URL}/${SPREADSHEET_ID}?fields=sheets.properties`, { headers: headers() })
+  const res = await apiFetch(`${BASE_URL}/${SPREADSHEET_ID}?fields=sheets.properties`, { headers: headers() })
   if (!res.ok) throw new Error(`Error obteniendo metadatos: ${res.status}`)
   const data = await res.json()
   const sheet = data.sheets.find(s => s.properties.title === sheetName)
@@ -64,7 +94,7 @@ export async function create(sheet, obj) {
   const id = await nextId(sheet)
   const newObj = { ...obj, Id: String(id) }
   const row = objectToRow(hdrs, newObj)
-  await fetch(
+  await apiFetch(
     `${BASE_URL}/${SPREADSHEET_ID}/values/${sheet}!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
     { method: 'POST', headers: headers(), body: JSON.stringify({ values: [row] }) }
   )
@@ -80,7 +110,7 @@ export async function update(sheet, id, obj) {
   const updatedObj = { ...rows[rowIndex], ...obj, Id: String(id) }
   const row = objectToRow(hdrs, updatedObj)
   const endCol = String.fromCharCode(64 + hdrs.length)
-  await fetch(
+  await apiFetch(
     `${BASE_URL}/${SPREADSHEET_ID}/values/${sheet}!A${sheetRowNumber}:${endCol}${sheetRowNumber}?valueInputOption=RAW`,
     { method: 'PUT', headers: headers(), body: JSON.stringify({ values: [row] }) }
   )
@@ -91,13 +121,9 @@ export async function remove(sheet, id) {
   const rows = await list(sheet)
   const rowIndex = rows.findIndex(r => String(r.Id) === String(id))
   if (rowIndex === -1) throw new Error(`Registro ${id} no encontrado`)
-
-  // rowIndex 0 = fila de datos 1 = fila 2 de Sheets (fila 1 es cabecera)
-  // startIndex es 0-based: fila de cabecera = 0, primera fila de datos = 1
   const startIndex = rowIndex + 1
   const sheetId = await getSheetId(sheet)
-
-  await fetch(
+  await apiFetch(
     `${BASE_URL}/${SPREADSHEET_ID}:batchUpdate`,
     {
       method: 'POST',
